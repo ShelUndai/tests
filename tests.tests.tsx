@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, NavigateFunction, Location, Params } from 'react-router-dom';
 import { ServicesView } from './ServicesPage';
 import * as router from 'react-router-dom';
 import { act } from 'react-dom/test-utils';
@@ -64,12 +64,21 @@ jest.mock('../../../layouts/EmailDetailsLayout/ServiceDetails/ServiceDetails', (
     toggleAccountConformity,
     startCreatingNewService,
     editExistingSvc,
+    openAlertDialog,
   }) => (
     <div data-testid="service-details">
       {selectedService ? <div>Selected: {selectedService.name}</div> : <div>No Service Selected</div>}
       <button onClick={toggleAccountConformity}>Toggle Conformity</button>
       <button onClick={startCreatingNewService}>Create Service</button>
       {selectedService && <button onClick={editExistingSvc}>Edit Service</button>}
+      {selectedService && (
+        <button
+          onClick={() => openAlertDialog({ target: { innerText: 'DEACTIVATE' } })}
+          data-testid="deactivate-button"
+        >
+          Deactivate
+        </button>
+      )}
     </div>
   ),
 }));
@@ -110,12 +119,15 @@ const initialState = {
 const store = mockStore(initialState);
 
 // Mock react-router-dom hooks
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: jest.fn(),
-  useLocation: jest.fn(),
-  useParams: jest.fn(),
-}));
+jest.mock('react-router-dom', () => {
+  const actualRouter = jest.requireActual('react-router-dom');
+  return {
+    ...actualRouter,
+    useNavigate: jest.fn<NavigateFunction, []>(),
+    useLocation: jest.fn<Location, []>(),
+    useParams: jest.fn<Readonly<Params<string>>, []>(),
+  };
+});
 
 // Mock the useStyles hook for withStyles
 const mockUseStyles = jest.fn(() => ({
@@ -133,18 +145,18 @@ const mockDispatch = jest.fn();
 store.dispatch = mockDispatch;
 
 describe('ServicesView Component', () => {
-  let mockNavigate, mockLocation, mockParams;
+  let mockNavigate: jest.Mock, mockLocation: Location, mockParams: Readonly<Params<string>>;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
     mockNavigate = jest.fn();
-    mockLocation = { pathname: '/services' };
+    mockLocation = { pathname: '/services' } as Location;
     mockParams = { svcId: '' };
 
-    router.useNavigate.mockReturnValue(mockNavigate);
-    router.useLocation.mockReturnValue(mockLocation);
-    router.useParams.mockReturnValue(mockParams);
+    (router.useNavigate as jest.Mock).mockReturnValue(mockNavigate);
+    (router.useLocation as jest.Mock).mockReturnValue(mockLocation);
+    (router.useParams as jest.Mock).mockReturnValue(mockParams);
 
     store.clearActions();
   });
@@ -227,7 +239,7 @@ describe('ServicesView Component', () => {
   });
 
   it('navigates to service details on mount with svcId', () => {
-    router.useParams.mockReturnValue({ svcId: 'svc1' });
+    (router.useParams as jest.Mock).mockReturnValue({ svcId: 'svc1' });
 
     render(
       <Provider store={store}>
@@ -381,13 +393,9 @@ describe('ServicesView Component', () => {
       fireEvent.click(service1);
     });
 
+    const deactivateButton = screen.getByTestId('deactivate-button');
     await act(async () => {
-      fireEvent.click(screen.getByText('Edit Service'));
-    });
-
-    await act(async () => {
-      const instance = screen.getByTestId('service-details').parentElement;
-      instance.__proto__.openAlertDialog({ target: { innerText: 'DEACTIVATE' } });
+      fireEvent.click(deactivateButton);
     });
 
     const executeButton = screen.getByText('DEACTIVATE SERVICE');
