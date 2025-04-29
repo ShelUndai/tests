@@ -144,8 +144,39 @@ jest.mock('../ServicesPage/styles', () => mockUseStyles);
 const mockDispatch = jest.fn();
 store.dispatch = mockDispatch;
 
+// Define the Props interface for ServicesView (to avoid importing it)
+interface Props {
+  closeErrorModal: jest.Mock;
+  routerProps: {
+    navigate: jest.Mock;
+    location: Location;
+    params: Readonly<Params<string>>;
+  };
+  accountHasUnlinked: boolean;
+  accountWasUnlinked: boolean;
+  fetchSVCs: jest.Mock;
+  fetchAllSVCs: jest.Mock;
+  fetchServiceToken: jest.Mock;
+  fetchAccounts: jest.Mock;
+  fetchGroups: jest.Mock;
+  fetchPayloads: jest.Mock;
+  addService: jest.Mock;
+  updateService: jest.Mock;
+  deleteService: jest.Mock;
+  removeGroupAccount: jest.Mock;
+  services: any;
+  isFetching: boolean;
+  allservices: { items: any; isFetching: boolean };
+  accounts: { items: any; isFetching: boolean };
+  payloads: { items: any; isFetching: boolean };
+  groups: { items: any; isFetching: boolean };
+  linkedAccounts: { account: any; groupId: string };
+  unlinkedAccount: { account: any; groupId: string };
+}
+
 describe('ServicesView Component', () => {
   let mockNavigate: jest.Mock, mockLocation: Location, mockParams: Readonly<Params<string>>;
+  let mockProps: Props;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -158,6 +189,47 @@ describe('ServicesView Component', () => {
     (router.useLocation as jest.Mock).mockReturnValue(mockLocation);
     (router.useParams as jest.Mock).mockReturnValue(mockParams);
 
+    mockProps = {
+      closeErrorModal: jest.fn(),
+      routerProps: {
+        navigate: mockNavigate,
+        location: mockLocation,
+        params: mockParams,
+      },
+      accountHasUnlinked: false,
+      accountWasUnlinked: false,
+      fetchSVCs: jest.fn(),
+      fetchAllSVCs: jest.fn(),
+      fetchServiceToken: jest.fn(),
+      fetchAccounts: jest.fn(),
+      fetchGroups: jest.fn(),
+      fetchPayloads: jest.fn(),
+      addService: jest.fn(),
+      updateService: jest.fn(),
+      deleteService: jest.fn(),
+      removeGroupAccount: jest.fn(),
+      services: initialState.services,
+      isFetching: false,
+      allservices: initialState.allservices,
+      accounts: initialState.accountsViewReducer,
+      payloads: {
+        items: [],
+        isFetching: false,
+      },
+      groups: {
+        items: [],
+        isFetching: false,
+      },
+      linkedAccounts: {
+        account: null,
+        groupId: '',
+      },
+      unlinkedAccount: {
+        account: null,
+        groupId: '',
+      },
+    };
+
     store.clearActions();
   });
 
@@ -165,7 +237,7 @@ describe('ServicesView Component', () => {
     render(
       <Provider store={store}>
         <MemoryRouter>
-          <ServicesView />
+          <ServicesView {...mockProps} />
         </MemoryRouter>
       </Provider>
     );
@@ -184,7 +256,7 @@ describe('ServicesView Component', () => {
     render(
       <Provider store={store}>
         <MemoryRouter>
-          <ServicesView />
+          <ServicesView {...mockProps} />
         </MemoryRouter>
       </Provider>
     );
@@ -204,7 +276,7 @@ describe('ServicesView Component', () => {
     render(
       <Provider store={store}>
         <MemoryRouter>
-          <ServicesView />
+          <ServicesView {...mockProps} />
         </MemoryRouter>
       </Provider>
     );
@@ -223,7 +295,7 @@ describe('ServicesView Component', () => {
     render(
       <Provider store={store}>
         <MemoryRouter>
-          <ServicesView />
+          <ServicesView {...mockProps} />
         </MemoryRouter>
       </Provider>
     );
@@ -244,7 +316,14 @@ describe('ServicesView Component', () => {
     render(
       <Provider store={store}>
         <MemoryRouter initialEntries={['/services/svc1']}>
-          <ServicesView />
+          <ServicesView
+            {...mockProps}
+            routerProps={{
+              navigate: mockNavigate,
+              location: mockLocation,
+              params: { svcId: 'svc1' },
+            }}
+          />
         </MemoryRouter>
       </Provider>
     );
@@ -278,7 +357,11 @@ describe('ServicesView Component', () => {
     render(
       <Provider store={paginatedStore}>
         <MemoryRouter>
-          <ServicesView />
+          <ServicesView
+            {...mockProps}
+            services={paginatedStore.getState().services}
+            allservices={paginatedStore.getState().allservices}
+          />
         </MemoryRouter>
       </Provider>
     );
@@ -299,7 +382,7 @@ describe('ServicesView Component', () => {
     render(
       <Provider store={store}>
         <MemoryRouter>
-          <ServicesView />
+          <ServicesView {...mockProps} />
         </MemoryRouter>
       </Provider>
     );
@@ -316,7 +399,7 @@ describe('ServicesView Component', () => {
     render(
       <Provider store={store}>
         <MemoryRouter>
-          <ServicesView />
+          <ServicesView {...mockProps} />
         </MemoryRouter>
       </Provider>
     );
@@ -333,7 +416,7 @@ describe('ServicesView Component', () => {
     render(
       <Provider store={store}>
         <MemoryRouter>
-          <ServicesView />
+          <ServicesView {...mockProps} />
         </MemoryRouter>
       </Provider>
     );
@@ -358,7 +441,7 @@ describe('ServicesView Component', () => {
     render(
       <Provider store={store}>
         <MemoryRouter>
-          <ServicesView />
+          <ServicesView {...mockProps} />
         </MemoryRouter>
       </Provider>
     );
@@ -383,7 +466,7 @@ describe('ServicesView Component', () => {
     render(
       <Provider store={store}>
         <MemoryRouter>
-          <ServicesView />
+          <ServicesView {...mockProps} />
         </MemoryRouter>
       </Provider>
     );
