@@ -59,7 +59,7 @@ jest.mock('react-router-dom', () => {
   };
 });
 
-// Mock network utils
+// Mock network utils using jest.fn()
 jest.mock('../../../../utils/network', () => ({
   networkFetchPayloads: jest.fn().mockImplementation(() => Promise.resolve([])),
   networkFetchAccounts: jest.fn().mockImplementation(() => Promise.resolve([])),
@@ -77,7 +77,7 @@ jest.mock('../../../../Redux/actions/network', () => ({
       GROUPS: 'GROUPS/FETCH',
       PAYLOADS: 'PAYLOADS/FETCH',
     };
-    return jest.fn().mockReturnValue({ type: types[typeArg] });
+    return () => ({ type: types[typeArg] });
   }),
   addService: jest.fn(),
   updateService: jest.fn(),
@@ -87,7 +87,7 @@ jest.mock('../../../../Redux/actions/network', () => ({
 }));
 
 // Mock the styles module
-jest.mock('../Services.styles.ts', () => jest.fn(() => ({
+jest.mock('../ServicesPage.styles.ts', () => jest.fn(() => ({
   classes: {
     views: 'mock-views',
     servicesContainer: 'mock-services-container',
@@ -187,6 +187,10 @@ describe('ServicesPage Component', () => {
       params: mockParams,
     };
 
+    // Ensure fetchSvcs and fetchAccounts are called by mocking their resolved values
+    networkFetchSvcs.mockResolvedValueOnce([]);
+    networkFetchAccounts.mockResolvedValueOnce([]);
+
     const ServicesViewWithRouter = withRouter(() => (
       <Provider store={store}>
         <ServicesView {...initialProps} routerProps={routerProps} />
@@ -199,13 +203,11 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const actions = store.getActions();
-    expect(actions).toContainEqual(
-      expect.objectContaining({ type: 'SERVICES/FETCH' })
-    );
-    expect(actions).toContainEqual(
-      expect.objectContaining({ type: 'ACCOUNTS/FETCH' })
-    );
+    // Wait for async effects to complete
+    await screen.findByText(/Services/);
+
+    expect(networkFetchSvcs).toHaveBeenCalledTimes(1);
+    expect(networkFetchAccounts).toHaveBeenCalledTimes(1);
   });
 
   test('renders with empty services list', () => {
@@ -238,13 +240,122 @@ describe('ServicesPage Component', () => {
     expect(screen.queryByText(/SB_DB_RND/i)).not.toBeInTheDocument();
   });
 
-  test('navigates to service details on mount with svcId', () => {
+  test('navigates to service details on mount with svcId', async () => {
+    const mockService = { svc_id: 254, name: 'Test Service' };
+    const updatedProps = {
+      ...initialProps,
+      services: {
+        items: [mockService],
+        isFetching: false,
+      },
+    };
+
     (router.useParams as jest.Mock).mockReturnValue({ svcId: '254' });
 
     const routerProps = {
       navigate: mockNavigate,
-      location: mockLocation,
+      location: { ...mockLocation, pathname: '/services' },
       params: { svcId: '254' },
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...updatedProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter initialEntries={['/services']}>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    // Wait for async effects to complete
+    await screen.findByText(/Services/);
+
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith('/services/254');
+  });
+
+  test('filters services when typing in the search input', async () => {
+    const mockService1 = { svc_id: 1, name: 'Service A' };
+    const mockService2 = { svc_id: 2, name: 'Service B' };
+    const updatedProps = {
+      ...initialProps,
+      services: {
+        items: [mockService1, mockService2],
+        isFetching: false,
+      },
+    };
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: mockParams,
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...updatedProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    const searchInput = screen.getByPlaceholderText(/Filter services/i);
+    fireEvent.change(searchInput, { target: { value: 'Service A' } });
+
+    const filteredServices = screen.getAllByText(/Service A/i);
+    expect(filteredServices[0]).toBeInTheDocument();
+    expect(screen.queryByText(/Service B/i)).not.toBeInTheDocument();
+  });
+
+  test('paginates services when clicking the next button', async () => {
+    const mockServicesList = Array.from({ length: 15 }, (_, i) => ({
+      svc_id: i + 1,
+      name: `Service ${i + 1}`,
+    }));
+    const updatedProps = {
+      ...initialProps,
+      services: {
+        items: mockServicesList,
+        isFetching: false,
+      },
+    };
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: mockParams,
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...updatedProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    const nextButton = screen.getByText(/Next/i);
+    fireEvent.click(nextButton);
+
+    expect(screen.getByText(/Page 2/i)).toBeInTheDocument();
+  });
+
+  test('initiates adding a new service when clicking add button', () => {
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: mockParams,
     };
 
     const ServicesViewWithRouter = withRouter(() => (
@@ -254,11 +365,14 @@ describe('ServicesPage Component', () => {
     ));
 
     render(
-      <MemoryRouter initialEntries={['/services/254']}>
+      <MemoryRouter>
         <ServicesViewWithRouter />
       </MemoryRouter>
     );
 
-    expect(mockNavigate).toHaveBeenCalledWith('/services/254');
+    const addButton = screen.getByText(/Add Service/i);
+    fireEvent.click(addButton);
+
+    expect(mockNavigate).toHaveBeenCalledWith('/services/add');
   });
 });
