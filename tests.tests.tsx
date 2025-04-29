@@ -30,7 +30,7 @@ jest.mock('../../../layouts/EmailDetailsLayout/ScrollListView/ScrollListView', (
       <div data-testid="scroll-list">
         <button onClick={handleAddClick}>Add Service</button>
         {services.map((svc) => (
-          <div key={svc.svc_id} onClick={() => listItemClick(svc)} data-testid={`service-${svc.svc_id}`}>
+          <div key={svc.id || svc.svc_id} onClick={() => listItemClick(svc)} data-testid={`service-${svc.id || svc.svc_id}`}>
             {svc.name}
           </div>
         ))}
@@ -96,27 +96,126 @@ jest.mock('../../../layouts/EmailDetailsLayout/AlertDialog', () => ({
 
 // Create a mock Redux store
 const mockStore = configureStore([]);
-const initialState = {
-  servicesViewReducer: { items: [], isFetching: false },
-  accountsViewReducer: { items: [], isFetching: false },
-  linkedAccount: { account: null, groupId: '' },
-  unlinkedAccount: { account: null, groupId: '' },
+
+// Define the mockInitialProps structure based on the images
+export const mockInitialProps = {
+  groups: {
+    items: [
+      {
+        id: 1,
+        name: "GFG",
+        ad: false,
+        oud: false,
+        mainframe: false,
+        credential: false,
+        cyberark_platform: false,
+        tech: "DYNAMIC",
+        name: "CSM_SECRETS",
+      },
+      {
+        id: 22,
+        name: "redis",
+      },
+    ],
+  },
+  payloads: {
+    items: [],
+    isFetching: false,
+  },
+  accounts: {
+    items: [
+      {
+        id: 53,
+        safe: "safe_1",
+        mnemonic: "id_3",
+        env: {
+          id: 1,
+          default_source: "default_1",
+          default_platform: {
+            id: 1,
+            tech: "CONJUR",
+            name: "AAM-MISC-R-L4",
+          },
+        },
+        url: "https://aam1-rnd.pncint.net",
+        push_url: null,
+        name: "CyberArk AAM RND CONJ",
+        aim_app_id: "PRO-CCP-RND",
+        aim_cred_app_id: "PRO-CCP-RND",
+        description: "CyberArk AIM interface in RND, onboarded as part of the conjur integration",
+        safe_apps: "AIMwebService_CCP",
+        ad_tech: null,
+        ad_platform: null,
+        ad_cpm: null,
+        ad_device: null,
+        ad_label: null,
+        cyberark_username: "PRO-Automation-RND",
+        conf_credential_key: "cyberark_rnd_password",
+        cyberark_user_safe: "PRO-PTO-R-CYBERARK",
+      },
+    ],
+    isFetching: true,
+  },
   services: {
     items: [
-      { svc_id: 'svc1', name: 'Service 1', mnemonic: { name: 'svc1' }, description: 'Desc 1' },
-      { svc_id: 'svc2', name: 'Service 2', mnemonic: { name: 'svc2' }, description: 'Desc 2' },
+      {
+        id: 254,
+        name: "254_44",
+        account_use: "APP",
+        cyberark_id: "653_8",
+        last_password_reset: "2024-04-17 15:46:35+08:00",
+        last_password_fetch: "2024-04-24 19:26:36+08:00",
+        record_creation_date: null,
+        user_defined_name: "SB_DB_RND",
+        address: "SB_DB_RND",
+        description: "This is a RND Credential Database",
+        active: true,
+        created_by: "PK26956",
+        cyberark_managed: false,
+        prod_domain: "",
+        rtm_number: null,
+        last_updated_timestamp: "2024-04-26T08:05:11.679246Z",
+      },
     ],
     isFetching: false,
   },
   allservices: {
     items: [
-      { svc_id: 'svc1', name: 'Service 1', mnemonic: { name: 'svc1' }, description: 'Desc 1' },
-      { svc_id: 'svc2', name: 'Service 2', mnemonic: { name: 'svc2' }, description: 'Desc 2' },
+      {
+        id: 254,
+        name: "254_44",
+        account_use: "APP",
+        cyberark_id: "653_8",
+        last_password_reset: "2024-04-17 15:46:35+08:00",
+        last_password_fetch: "2024-04-24 19:26:36+08:00",
+        record_creation_date: null,
+        user_defined_name: "SB_DB_RND",
+        address: "SB_DB_RND",
+        description: "This is a RND Credential Database",
+        active: true,
+        created_by: "PK26956",
+        cyberark_managed: false,
+        prod_domain: "",
+        rtm_number: null,
+        last_updated_timestamp: "2024-04-26T08:05:11.679246Z",
+      },
     ],
     isFetching: false,
   },
+  isFetching: false,
+  accountWasUnlinked: false,
+  accountHasUnlinked: false,
 };
-const store = mockStore(initialState);
+
+// Initialize the mock store with mockInitialProps
+const store = mockStore({
+  servicesViewReducer: mockInitialProps.services,
+  accountsViewReducer: mockInitialProps.accounts,
+  linkedAccount: { account: null, groupId: '' },
+  unlinkedAccount: { account: null, groupId: '' },
+  services: mockInitialProps.services,
+  allservices: mockInitialProps.allservices,
+});
 
 // Mock react-router-dom hooks
 jest.mock('react-router-dom', () => {
@@ -144,45 +243,111 @@ jest.mock('../ServicesPage/styles', () => mockUseStyles);
 const mockDispatch = jest.fn();
 store.dispatch = mockDispatch;
 
-// Define the Props interface for ServicesView (to avoid importing it)
-interface Props {
-  closeErrorModal: jest.Mock;
-  routerProps: {
-    navigate: jest.Mock;
-    location: Location;
-    params: Readonly<Params<string>>;
+// Define a more accurate Props interface for ServicesView
+interface RouterProps {
+  navigate: NavigateFunction;
+  location: Location;
+  params: Readonly<Params<string>>;
+}
+
+interface Service {
+  id: number;
+  name: string;
+  account_use: string;
+  cyberark_id: string;
+  last_password_reset: string;
+  last_password_fetch: string;
+  record_creation_date: string | null;
+  user_defined_name: string;
+  address: string;
+  description: string;
+  active: boolean;
+  created_by: string;
+  cyberark_managed: boolean;
+  prod_domain: string;
+  rtm_number: string | null;
+  last_updated_timestamp: string;
+}
+
+interface Account {
+  id: number;
+  safe: string;
+  mnemonic: string;
+  env: {
+    id: number;
+    default_source: string;
+    default_platform: {
+      id: number;
+      tech: string;
+      name: string;
+    };
   };
+  url: string;
+  push_url: string | null;
+  name: string;
+  aim_app_id: string;
+  aim_cred_app_id: string;
+  description: string;
+  safe_apps: string;
+  ad_tech: string | null;
+  ad_platform: string | null;
+  ad_cpm: string | null;
+  ad_device: string | null;
+  ad_label: string | null;
+  cyberark_username: string;
+  conf_credential_key: string;
+  cyberark_user_safe: string;
+}
+
+interface Group {
+  id: number;
+  name: string;
+  ad?: boolean;
+  oud?: boolean;
+  mainframe?: boolean;
+  credential?: boolean;
+  cyberark_platform?: boolean;
+  tech?: string;
+}
+
+interface Props {
+  closeErrorModal: (...args: any[]) => any;
+  routerProps: RouterProps;
   accountHasUnlinked: boolean;
   accountWasUnlinked: boolean;
-  fetchSVCs: jest.Mock;
-  fetchAllSVCs: jest.Mock;
-  fetchServiceToken: jest.Mock;
-  fetchAccounts: jest.Mock;
-  fetchGroups: jest.Mock;
-  fetchPayloads: jest.Mock;
-  addService: jest.Mock;
-  updateService: jest.Mock;
-  deleteService: jest.Mock;
-  removeGroupAccount: jest.Mock;
-  services: any;
+  fetchSVCs: (...args: any[]) => any;
+  fetchAllSVCs: (...args: any[]) => any;
+  fetchServiceToken: (...args: any[]) => any;
+  fetchAccounts: (...args: any[]) => any;
+  fetchGroups: (...args: any[]) => any;
+  fetchPayloads: (...args: any[]) => any;
+  addService: (...args: any[]) => any;
+  updateService: (...args: any[]) => any;
+  deleteService: (...args: any[]) => any;
+  removeGroupAccount: (...args: any[]) => any;
+  services: { items: Service[]; isFetching: boolean };
   isFetching: boolean;
-  allservices: { items: any; isFetching: boolean };
-  accounts: { items: any; isFetching: boolean };
-  payloads: { items: any; isFetching: boolean };
-  groups: { items: any; isFetching: boolean };
+  allservices: { items: Service[]; isFetching: boolean };
+  accounts: { items: Account[]; isFetching: boolean };
+  payloads: { items: any[]; isFetching: boolean };
+  groups: { items: Group[]; isFetching?: boolean };
   linkedAccounts: { account: any; groupId: string };
   unlinkedAccount: { account: any; groupId: string };
+  showError?: boolean;
+  classes?: any;
 }
 
 describe('ServicesView Component', () => {
-  let mockNavigate: jest.Mock, mockLocation: Location, mockParams: Readonly<Params<string>>;
+  let mockNavigate: NavigateFunction;
+  let mockLocation: Location;
+  let mockParams: Readonly<Params<string>>;
   let mockProps: Props;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
     mockNavigate = jest.fn();
-    mockLocation = { pathname: '/services' } as Location;
+    mockLocation = { pathname: '/services', search: '', hash: '', state: null, key: '' };
     mockParams = { svcId: '' };
 
     (router.useNavigate as jest.Mock).mockReturnValue(mockNavigate);
@@ -196,8 +361,8 @@ describe('ServicesView Component', () => {
         location: mockLocation,
         params: mockParams,
       },
-      accountHasUnlinked: false,
-      accountWasUnlinked: false,
+      accountHasUnlinked: mockInitialProps.accountHasUnlinked,
+      accountWasUnlinked: mockInitialProps.accountWasUnlinked,
       fetchSVCs: jest.fn(),
       fetchAllSVCs: jest.fn(),
       fetchServiceToken: jest.fn(),
@@ -208,18 +373,12 @@ describe('ServicesView Component', () => {
       updateService: jest.fn(),
       deleteService: jest.fn(),
       removeGroupAccount: jest.fn(),
-      services: initialState.services,
-      isFetching: false,
-      allservices: initialState.allservices,
-      accounts: initialState.accountsViewReducer,
-      payloads: {
-        items: [],
-        isFetching: false,
-      },
-      groups: {
-        items: [],
-        isFetching: false,
-      },
+      services: mockInitialProps.services,
+      isFetching: mockInitialProps.isFetching,
+      allservices: mockInitialProps.allservices,
+      accounts: mockInitialProps.accounts,
+      payloads: mockInitialProps.payloads,
+      groups: mockInitialProps.groups,
       linkedAccounts: {
         account: null,
         groupId: '',
@@ -228,6 +387,7 @@ describe('ServicesView Component', () => {
         account: null,
         groupId: '',
       },
+      showError: false,
     };
 
     store.clearActions();
@@ -248,8 +408,7 @@ describe('ServicesView Component', () => {
     expect(screen.getByTestId('pagination')).toBeInTheDocument();
     expect(screen.getByTestId('service-details')).toBeInTheDocument();
 
-    expect(screen.getByText('Service 1')).toBeInTheDocument();
-    expect(screen.getByText('Service 2')).toBeInTheDocument();
+    expect(screen.getByText('254_44')).toBeInTheDocument();
   });
 
   it('fetches services and accounts on mount', async () => {
@@ -273,6 +432,29 @@ describe('ServicesView Component', () => {
   });
 
   it('filters services based on input', async () => {
+    mockProps.services.items = [
+      ...mockProps.services.items,
+      {
+        id: 255,
+        name: "255_45",
+        account_use: "APP",
+        cyberark_id: "653_9",
+        last_password_reset: "2024-04-18 15:46:35+08:00",
+        last_password_fetch: "2024-04-25 19:26:36+08:00",
+        record_creation_date: null,
+        user_defined_name: "SB_DB_RND_2",
+        address: "SB_DB_RND_2",
+        description: "Another RND Credential Database",
+        active: true,
+        created_by: "PK26957",
+        cyberark_managed: false,
+        prod_domain: "",
+        rtm_number: null,
+        last_updated_timestamp: "2024-04-27T08:05:11.679246Z",
+      },
+    ];
+    mockProps.allservices.items = mockProps.services.items;
+
     render(
       <Provider store={store}>
         <MemoryRouter>
@@ -284,11 +466,11 @@ describe('ServicesView Component', () => {
     const filterInput = screen.getByTestId('search-box');
 
     await act(async () => {
-      fireEvent.change(filterInput, { target: { value: 'Service 1' } });
+      fireEvent.change(filterInput, { target: { value: '254_44' } });
     });
 
-    expect(screen.getByText('Service 1')).toBeInTheDocument();
-    expect(screen.queryByText('Service 2')).not.toBeInTheDocument();
+    expect(screen.getByText('254_44')).toBeInTheDocument();
+    expect(screen.queryByText('255_45')).not.toBeInTheDocument();
   });
 
   it('selects a service on click', async () => {
@@ -302,53 +484,77 @@ describe('ServicesView Component', () => {
 
     expect(screen.getByText('No Service Selected')).toBeInTheDocument();
 
-    const service1 = screen.getByTestId('service-svc1');
+    const service = screen.getByTestId('service-254');
     await act(async () => {
-      fireEvent.click(service1);
+      fireEvent.click(service);
     });
 
-    expect(screen.getByText('Selected: Service 1')).toBeInTheDocument();
+    expect(screen.getByText('Selected: 254_44')).toBeInTheDocument();
   });
 
   it('navigates to service details on mount with svcId', () => {
-    (router.useParams as jest.Mock).mockReturnValue({ svcId: 'svc1' });
+    (router.useParams as jest.Mock).mockReturnValue({ svcId: '254' });
 
     render(
       <Provider store={store}>
-        <MemoryRouter initialEntries={['/services/svc1']}>
+        <MemoryRouter initialEntries={['/services/254']}>
           <ServicesView
             {...mockProps}
             routerProps={{
               navigate: mockNavigate,
               location: mockLocation,
-              params: { svcId: 'svc1' },
+              params: { svcId: '254' },
             }}
           />
         </MemoryRouter>
       </Provider>
     );
 
-    expect(mockNavigate).toHaveBeenCalledWith('/services/svc1');
+    expect(mockNavigate).toHaveBeenCalledWith('/services/254');
   });
 
   it('handles pagination correctly', async () => {
     const paginatedStore = mockStore({
-      ...initialState,
+      ...mockInitialProps,
       services: {
         items: Array.from({ length: 30 }, (_, i) => ({
-          svc_id: `svc${i + 1}`,
-          name: `Service ${i + 1}`,
-          mnemonic: { name: `svc${i + 1}` },
-          description: `Desc ${i + 1}`,
+          id: 254 + i,
+          name: `Service_${254 + i}`,
+          account_use: "APP",
+          cyberark_id: `653_${i}`,
+          last_password_reset: "2024-04-17 15:46:35+08:00",
+          last_password_fetch: "2024-04-24 19:26:36+08:00",
+          record_creation_date: null,
+          user_defined_name: `SB_DB_RND_${i}`,
+          address: `SB_DB_RND_${i}`,
+          description: "This is a RND Credential Database",
+          active: true,
+          created_by: "PK26956",
+          cyberark_managed: false,
+          prod_domain: "",
+          rtm_number: null,
+          last_updated_timestamp: "2024-04-26T08:05:11.679246Z",
         })),
         isFetching: false,
       },
       allservices: {
         items: Array.from({ length: 30 }, (_, i) => ({
-          svc_id: `svc${i + 1}`,
-          name: `Service ${i + 1}`,
-          mnemonic: { name: `svc${i + 1}` },
-          description: `Desc ${i + 1}`,
+          id: 254 + i,
+          name: `Service_${254 + i}`,
+          account_use: "APP",
+          cyberark_id: `653_${i}`,
+          last_password_reset: "2024-04-17 15:46:35+08:00",
+          last_password_fetch: "2024-04-24 19:26:36+08:00",
+          record_creation_date: null,
+          user_defined_name: `SB_DB_RND_${i}`,
+          address: `SB_DB_RND_${i}`,
+          description: "This is a RND Credential Database",
+          active: true,
+          created_by: "PK26956",
+          cyberark_managed: false,
+          prod_domain: "",
+          rtm_number: null,
+          last_updated_timestamp: "2024-04-26T08:05:11.679246Z",
         })),
         isFetching: false,
       },
@@ -366,16 +572,16 @@ describe('ServicesView Component', () => {
       </Provider>
     );
 
-    expect(screen.getByText('Service 1')).toBeInTheDocument();
-    expect(screen.queryByText('Service 26')).not.toBeInTheDocument();
+    expect(screen.getByText('Service_254')).toBeInTheDocument();
+    expect(screen.queryByText('Service_284')).not.toBeInTheDocument();
 
     const nextButton = screen.getByText('Next');
     await act(async () => {
       fireEvent.click(nextButton);
     });
 
-    expect(screen.queryByText('Service 1')).not.toBeInTheDocument();
-    expect(screen.getByText('Service 26')).toBeInTheDocument();
+    expect(screen.queryByText('Service_254')).not.toBeInTheDocument();
+    expect(screen.getByText('Service_284')).toBeInTheDocument();
   });
 
   it('updates limit correctly', async () => {
@@ -446,9 +652,9 @@ describe('ServicesView Component', () => {
       </Provider>
     );
 
-    const service1 = screen.getByTestId('service-svc1');
+    const service = screen.getByTestId('service-254');
     await act(async () => {
-      fireEvent.click(service1);
+      fireEvent.click(service);
     });
 
     const editButton = screen.getByText('Edit Service');
@@ -471,9 +677,9 @@ describe('ServicesView Component', () => {
       </Provider>
     );
 
-    const service1 = screen.getByTestId('service-svc1');
+    const service = screen.getByTestId('service-254');
     await act(async () => {
-      fireEvent.click(service1);
+      fireEvent.click(service);
     });
 
     const deactivateButton = screen.getByTestId('deactivate-button');
