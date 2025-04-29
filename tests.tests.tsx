@@ -8,9 +8,9 @@ import { ServicesView } from '../ServicesPage';
 import { withRouter } from '../../../../utils/withRouter';
 import { withStyles } from '../../../../utils/withStyles';
 import { mockInitialProps } from '../../../../constants/mocks/mockAccounts';
-import mockAccounts from '../../../../constants/mocks/mockAccounts';
-import mockPayloads from '../../../../constants/mocks/mockPayloads';
-import mockServices from '../../../../constants/mocks/mockServices';
+import { mockAccounts } from '../../../../constants/mocks/mockAccounts';
+import { mockPayloads } from '../../../../constants/mocks/mockPayloads';
+import { mockServices } from '../../../../constants/mocks/mockServices';
 import { defaultState } from '../../../../Redux/store';
 import {
   networkFetchPayloads,
@@ -28,8 +28,8 @@ import {
   fetchServiceToken,
 } from '../../../../Redux/actions/network';
 
-// Mock child components
-jest.mock('../../../layouts/EmailDetailsLayout/SearchBox/SearchBox', () => ({
+// Mock child components with corrected paths
+jest.mock('../../../../layouts/EmailDetailsLayout/SearchBox/SearchBox', () => ({
   SearchBox: ({ filterValue, onInputChange }) => (
     <input
       data-testid="search-box"
@@ -40,11 +40,11 @@ jest.mock('../../../layouts/EmailDetailsLayout/SearchBox/SearchBox', () => ({
   ),
 }));
 
-jest.mock('../../../layouts/EmailDetailsLayout/NavBarView/navBarView', () => ({
+jest.mock('../../../../layouts/EmailDetailsLayout/NavBarView/navBarView', () => ({
   NavBarView: () => <div data-testid="nav-bar">NavBar</div>,
 }));
 
-jest.mock('../../../layouts/EmailDetailsLayout/ScrollListView/ScrollListView', () => ({
+jest.mock('../../../../layouts/EmailDetailsLayout/ScrollListView/ScrollListView', () => ({
   ScrollListView: ({ items, filterValue, filteredItems, listItemClick, handleAddClick }) => {
     const services = filterValue ? filteredItems.items : items.items;
     return (
@@ -60,7 +60,7 @@ jest.mock('../../../layouts/EmailDetailsLayout/ScrollListView/ScrollListView', (
   },
 }));
 
-jest.mock('../../../layouts/EmailDetailsLayout/PaginationView/PaginationView', () => ({
+jest.mock('../../../../layouts/EmailDetailsLayout/PaginationView/PaginationView', () => ({
   PaginationView: ({ items, filterValue, filteredItems, page, limit, handleNext, handlePrevious, updateLimit }) => {
     const services = filterValue ? filteredItems.items : items.items;
     const totalPages = Math.ceil(services.length / limit);
@@ -79,7 +79,7 @@ jest.mock('../../../layouts/EmailDetailsLayout/PaginationView/PaginationView', (
   },
 }));
 
-jest.mock('../../../layouts/EmailDetailsLayout/ServiceDetails/ServiceDetails', () => ({
+jest.mock('../../../../layouts/EmailDetailsLayout/ServiceDetails/ServiceDetails', () => ({
   ServiceDetails: ({
     selectedService,
     toggleAccountConformity,
@@ -104,7 +104,7 @@ jest.mock('../../../layouts/EmailDetailsLayout/ServiceDetails/ServiceDetails', (
   ),
 }));
 
-jest.mock('../../../layouts/EmailDetailsLayout/AlertDialog', () => ({
+jest.mock('../../../../layouts/EmailDetailsLayout/AlertDialog/AlertDialog', () => ({
   AlertDialog: ({ shouldOpen, closeFn, executeFn, description, executeMessage }) =>
     shouldOpen ? (
       <div data-testid="alert-dialog">
@@ -175,7 +175,7 @@ jest.mock('../../../../Redux/actions/network', () => ({
   fetchServiceToken: jest.fn(),
 }));
 
-// Mock the withStyles HOC
+// Define mockUseStyles before using it in jest.mock
 const mockUseStyles = jest.fn(() => ({
   classes: {
     views: 'mock-views',
@@ -185,7 +185,9 @@ const mockUseStyles = jest.fn(() => ({
     redAnswer: 'mock-red-answer',
   },
 }));
-jest.mock('../ServicesPage/styles', () => mockUseStyles);
+
+// Mock the styles module with corrected path
+jest.mock('../Services.styles.ts', () => mockUseStyles);
 
 // Initialize the mock store using defaultState and imported mocks
 const store = mockStore({
