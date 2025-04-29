@@ -1,13 +1,12 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
+import * as React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
 import { MemoryRouter, NavigateFunction, Location, Params } from 'react-router-dom';
 import * as router from 'react-router-dom';
 import { ServicesView } from '../ServicesPage';
 import { withRouter } from '../../../../utils/withRouter';
-import { withStyles } from '../../../../utils/withStyles';
-import { mockInitialProps } from '../../../../constants/mocks/mockAccounts';
+import { mockInitialProps } from './mocks';
 import { mockAccounts } from '../../../../constants/mocks/mockAccounts';
 import { mockPayloads } from '../../../../constants/mocks/mockPayloads';
 import { mockServices } from '../../../../constants/mocks/mockServices';
@@ -20,100 +19,13 @@ import {
 } from '../../../../utils/network';
 import {
   createFetchActionCreator,
-  closeErrorModal,
   addService,
   updateService,
   deleteService,
   removeGroupAccount,
   fetchServiceToken,
 } from '../../../../Redux/actions/network';
-
-// Mock child components with corrected paths
-jest.mock('../../../../layouts/EmailDetailsLayout/SearchBox/SearchBox', () => ({
-  SearchBox: ({ filterValue, onInputChange }) => (
-    <input
-      data-testid="search-box"
-      value={filterValue}
-      onChange={onInputChange}
-      placeholder="Filter services..."
-    />
-  ),
-}));
-
-jest.mock('../../../../layouts/EmailDetailsLayout/NavBarView/navBarView', () => ({
-  NavBarView: () => <div data-testid="nav-bar">NavBar</div>,
-}));
-
-jest.mock('../../../../layouts/EmailDetailsLayout/ScrollListView/ScrollListView', () => ({
-  ScrollListView: ({ items, filterValue, filteredItems, listItemClick, handleAddClick }) => {
-    const services = filterValue ? filteredItems.items : items.items;
-    return (
-      <div data-testid="scroll-list">
-        <button onClick={handleAddClick}>Add Service</button>
-        {services.map((svc) => (
-          <div key={svc.id || svc.svc_id} onClick={() => listItemClick(svc)} data-testid={`service-${svc.id || svc.svc_id}`}>
-            {svc.name}
-          </div>
-        ))}
-      </div>
-    );
-  },
-}));
-
-jest.mock('../../../../layouts/EmailDetailsLayout/PaginationView/PaginationView', () => ({
-  PaginationView: ({ items, filterValue, filteredItems, page, limit, handleNext, handlePrevious, updateLimit }) => {
-    const services = filterValue ? filteredItems.items : items.items;
-    const totalPages = Math.ceil(services.length / limit);
-    return (
-      <div data-testid="pagination">
-        <span>Page {page}</span>
-        <button onClick={handlePrevious} disabled={page === 1}>
-          Previous
-        </button>
-        <button onClick={handleNext} disabled={page === totalPages}>
-          Next
-        </button>
-        <button onClick={() => updateLimit(10, services)}>Set Limit 10</button>
-      </div>
-    );
-  },
-}));
-
-jest.mock('../../../../layouts/EmailDetailsLayout/ServiceDetails/ServiceDetails', () => ({
-  ServiceDetails: ({
-    selectedService,
-    toggleAccountConformity,
-    startCreatingNewService,
-    editExistingSvc,
-    openAlertDialog,
-  }) => (
-    <div data-testid="service-details">
-      {selectedService ? <div>Selected: {selectedService.name}</div> : <div>No Service Selected</div>}
-      <button onClick={toggleAccountConformity}>Toggle Conformity</button>
-      <button onClick={startCreatingNewService}>Create Service</button>
-      {selectedService && <button onClick={editExistingSvc}>Edit Service</button>}
-      {selectedService && (
-        <button
-          onClick={() => openAlertDialog({ target: { innerText: 'DEACTIVATE' } })}
-          data-testid="deactivate-button"
-        >
-          Deactivate
-        </button>
-      )}
-    </div>
-  ),
-}));
-
-jest.mock('../../../../layouts/EmailDetailsLayout/AlertDialog/AlertDialog', () => ({
-  AlertDialog: ({ shouldOpen, closeFn, executeFn, description, executeMessage }) =>
-    shouldOpen ? (
-      <div data-testid="alert-dialog">
-        <p>{description}</p>
-        <button onClick={closeFn}>Cancel</button>
-        <button onClick={executeFn}>{executeMessage}</button>
-      </div>
-    ) : null,
-}));
+import { closeErrorModal } from '../../../../Redux/actions/misc';
 
 // Mock localStorage
 const mockLocalStorage = (() => {
@@ -141,9 +53,9 @@ jest.mock('react-router-dom', () => {
   const actualRouter = jest.requireActual('react-router-dom');
   return {
     ...actualRouter,
-    useNavigate: jest.fn<NavigateFunction, []>(),
-    useLocation: jest.fn<Location, []>(),
-    useParams: jest.fn<Readonly<Params<string>>, []>(),
+    useNavigate: jest.fn(),
+    useLocation: jest.fn(),
+    useParams: jest.fn(),
   };
 });
 
@@ -167,7 +79,6 @@ jest.mock('../../../../Redux/actions/network', () => ({
     };
     return jest.fn().mockReturnValue({ type: types[typeArg] });
   }),
-  closeErrorModal: jest.fn(),
   addService: jest.fn(),
   updateService: jest.fn(),
   deleteService: jest.fn(),
@@ -175,8 +86,8 @@ jest.mock('../../../../Redux/actions/network', () => ({
   fetchServiceToken: jest.fn(),
 }));
 
-// Define mockUseStyles before using it in jest.mock
-const mockUseStyles = jest.fn(() => ({
+// Mock the styles module
+jest.mock('../Services.styles.ts', () => jest.fn(() => ({
   classes: {
     views: 'mock-views',
     servicesContainer: 'mock-services-container',
@@ -184,10 +95,7 @@ const mockUseStyles = jest.fn(() => ({
     greenAnswer: 'mock-green-answer',
     redAnswer: 'mock-red-answer',
   },
-}));
-
-// Mock the styles module with corrected path
-jest.mock('../Services.styles.ts', () => mockUseStyles);
+})));
 
 // Initialize the mock store using defaultState and imported mocks
 const store = mockStore({
@@ -248,12 +156,18 @@ describe('ServicesPage Component', () => {
     store.clearActions();
   });
 
-  test('renders ServicesPage with the "Services" text', () => {
-    const ServicesViewWithRouter = withRouter(withStyles(() => (
+  test('renders ServicesPage with the "Services" text in the first instance', () => {
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: mockParams,
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
       <Provider store={store}>
-        <ServicesView {...initialProps} />
+        <ServicesView {...initialProps} routerProps={routerProps} />
       </Provider>
-    )));
+    ));
 
     render(
       <MemoryRouter>
@@ -261,6 +175,90 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText(/Services/)).toBeInTheDocument();
+    const servicesElements = screen.getAllByText(/Services/);
+    expect(servicesElements[0]).toBeInTheDocument();
+    expect(servicesElements[0]).toHaveTextContent('Services');
+  });
+
+  test('fetches services and accounts on mount', async () => {
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: mockParams,
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...initialProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    const actions = store.getActions();
+    expect(actions).toContainEqual(
+      expect.objectContaining({ type: 'SERVICES/FETCH' })
+    );
+    expect(actions).toContainEqual(
+      expect.objectContaining({ type: 'ACCOUNTS/FETCH' })
+    );
+  });
+
+  test('renders with empty services list', () => {
+    const emptyProps = {
+      ...initialProps,
+      services: { items: [], isFetching: false },
+      allservices: { items: [], isFetching: false },
+    };
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: mockParams,
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...emptyProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    const servicesElements = screen.getAllByText(/Services/);
+    expect(servicesElements[0]).toBeInTheDocument();
+    expect(screen.queryByText(/SB_DB_RND/i)).not.toBeInTheDocument();
+  });
+
+  test('navigates to service details on mount with svcId', () => {
+    (router.useParams as jest.Mock).mockReturnValue({ svcId: '254' });
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: { svcId: '254' },
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...initialProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter initialEntries={['/services/254']}>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    expect(mockNavigate).toHaveBeenCalledWith('/services/254');
   });
 });
