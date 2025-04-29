@@ -3,11 +3,14 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
 import { MemoryRouter, NavigateFunction, Location, Params } from 'react-router-dom';
-import { ServicesView } from './ServicesPage';
+import { ServicesView } from '../ServicesPage';
 import * as router from 'react-router-dom';
 import { act } from 'react-dom/test-utils';
+import { withRouter } from '../../../../utils/withRouter';
+import { withStyles } from '../../../../utils/withStyles';
+import { BannerMsg } from '../../../../types';
 
-// Mock child components
+// Mock child components to simplify testing
 jest.mock('../../../layouts/EmailDetailsLayout/SearchBox/SearchBox', () => ({
   SearchBox: ({ filterValue, onInputChange }) => (
     <input
@@ -94,18 +97,26 @@ jest.mock('../../../layouts/EmailDetailsLayout/AlertDialog', () => ({
     ) : null,
 }));
 
-// Create a mock Redux store
-const mockStore = configureStore([]);
+// Mock localStorage
+const mockLocalStorage = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: jest.fn((key: string) => store[key] || null),
+    setItem: jest.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    clear: () => {
+      store = {};
+    },
+    removeItem: (key: string) => delete store[key],
+    length: 0,
+    key: (i: number) => Object.keys(store)[i] || null,
+  };
+})();
+Object.defineProperty(window, 'localStorage', { value: mockLocalStorage });
 
-// Initialize the mock store with mockInitialProps
-const store = mockStore({
-  servicesViewReducer: mockInitialProps.services,
-  accountsViewReducer: mockInitialProps.accounts,
-  linkedAccount: { account: null, groupId: '' },
-  unlinkedAccount: { account: null, groupId: '' },
-  services: mockInitialProps.services,
-  allservices: mockInitialProps.allservices,
-});
+// Mock Redux store
+const mockStore = configureStore([]);
 
 // Mock react-router-dom hooks
 jest.mock('react-router-dom', () => {
@@ -118,7 +129,35 @@ jest.mock('react-router-dom', () => {
   };
 });
 
-// Mock the useStyles hook for withStyles
+// Mock network utils
+jest.mock('../../../../utils/network', () => ({
+  networkFetchPayloads: jest.fn().mockImplementation(() => Promise.resolve([])),
+  networkFetchAccounts: jest.fn().mockImplementation(() => Promise.resolve([])),
+  networkFetchSvcGroups: jest.fn().mockImplementation(() => Promise.resolve([])),
+  networkFetchSvcs: jest.fn().mockImplementation(() => Promise.resolve([])),
+}));
+
+// Mock Redux actions
+jest.mock('../../../../Redux/actions/network', () => ({
+  createFetchActionCreator: jest.fn().mockImplementation((typeArg) => {
+    const types = {
+      SERVICES: 'SERVICES/FETCH',
+      ALLSERVICES: 'ALLSERVICES/FETCH',
+      ACCOUNTS: 'ACCOUNTS/FETCH',
+      GROUPS: 'GROUPS/FETCH',
+      PAYLOADS: 'PAYLOADS/FETCH',
+    };
+    return jest.fn().mockReturnValue({ type: types[typeArg] });
+  }),
+  closeErrorModal: jest.fn(),
+  addService: jest.fn(),
+  updateService: jest.fn(),
+  deleteService: jest.fn(),
+  removeGroupAccount: jest.fn(),
+  fetchServiceToken: jest.fn(),
+}));
+
+// Mock the withStyles HOC
 const mockUseStyles = jest.fn(() => ({
   classes: {
     views: 'mock-views',
@@ -130,6 +169,135 @@ const mockUseStyles = jest.fn(() => ({
 }));
 jest.mock('../ServicesPage/styles', () => mockUseStyles);
 
+// Define mockInitialProps based on previous structure
+const mockInitialProps = {
+  groups: {
+    items: [
+      {
+        id: 1,
+        name: "GFG",
+        ad: false,
+        oud: false,
+        mainframe: false,
+        credential: false,
+        cyberark_platform: false,
+        tech: "DYNAMIC",
+        name: "CSM_SECRETS",
+      },
+      {
+        id: 22,
+        name: "redis",
+      },
+    ],
+  },
+  payloads: {
+    items: [],
+    isFetching: false,
+  },
+  accounts: {
+    items: [
+      {
+        id: 53,
+        safe: "safe_1",
+        mnemonic: "id_3",
+        env: {
+          id: 1,
+          default_source: "default_1",
+          default_platform: {
+            id: 1,
+            tech: "CONJUR",
+            name: "AAM-MISC-R-L4",
+          },
+        },
+        url: "https://aam1-rnd.pncint.net",
+        push_url: null,
+        name: "CyberArk AAM RND CONJ",
+        aim_app_id: "PRO-CCP-RND",
+        aim_cred_app_id: "PRO-CCP-RND",
+        description: "CyberArk AIM interface in RND, onboarded as part of the conjur integration",
+        safe_apps: "AIMwebService_CCP",
+        ad_tech: null,
+        ad_platform: null,
+        ad_cpm: null,
+        ad_device: null,
+        ad_label: null,
+        cyberark_username: "PRO-Automation-RND",
+        conf_credential_key: "cyberark_rnd_password",
+        cyberark_user_safe: "PRO-PTO-R-CYBERARK",
+      },
+    ],
+    isFetching: true,
+  },
+  services: {
+    items: [
+      {
+        id: 254,
+        name: "254_44",
+        account_use: "APP",
+        cyberark_id: "653_8",
+        last_password_reset: "2024-04-17 15:46:35+08:00",
+        last_password_fetch: "2024-04-24 19:26:36+08:00",
+        record_creation_date: null,
+        user_defined_name: "SB_DB_RND",
+        address: "SB_DB_RND",
+        description: "This is a RND Credential Database",
+        active: true,
+        created_by: "PK26956",
+        cyberark_managed: false,
+        prod_domain: "",
+        rtm_number: null,
+        last_updated_timestamp: "2024-04-26T08:05:11.679246Z",
+      },
+    ],
+    isFetching: false,
+  },
+  allservices: {
+    items: [
+      {
+        id: 254,
+        name: "254_44",
+        account_use: "APP",
+        cyberark_id: "653_8",
+        last_password_reset: "2024-04-17 15:46:35+08:00",
+        last_password_fetch: "2024-04-24 19:26:36+08:00",
+        record_creation_date: null,
+        user_defined_name: "SB_DB_RND",
+        address: "SB_DB_RND",
+        description: "This is a RND Credential Database",
+        active: true,
+        created_by: "PK26956",
+        cyberark_managed: false,
+        prod_domain: "",
+        rtm_number: null,
+        last_updated_timestamp: "2024-04-26T08:05:11.679246Z",
+      },
+    ],
+    isFetching: false,
+  },
+  isFetching: false,
+  accountWasUnlinked: false,
+  accountHasUnlinked: false,
+};
+
+// Initialize the mock store with mockInitialProps
+const store = mockStore({
+  servicesViewReducer: mockInitialProps.services,
+  accountsViewReducer: mockInitialProps.accounts,
+  linkedAccount: { account: null, groupId: '' },
+  unlinkedAccount: { account: null, groupId: '' },
+  services: mockInitialProps.services,
+  allservices: mockInitialProps.allservices,
+  bannerViewReducer: {
+    banner: {
+      timestamp: '2023-07-20T12:00:00Z',
+      banner: 'System Maintenance Notice',
+      warning: 'Security Alert: Critical Update Required',
+      help_url: 'https://support.example.com',
+    },
+    isFetching: false,
+  },
+});
+
 const mockDispatch = jest.fn();
 store.dispatch = mockDispatch;
 
@@ -140,14 +308,73 @@ interface RouterProps {
   params: Readonly<Params<string>>;
 }
 
+interface Service {
+  id: number;
+  name: string;
+  account_use: string;
+  cyberark_id: string;
+  last_password_reset: string;
+  last_password_fetch: string;
+  record_creation_date: string | null;
+  user_defined_name: string;
+  address: string;
+  description: string;
+  active: boolean;
+  created_by: string;
+  cyberark_managed: boolean;
+  prod_domain: string;
+  rtm_number: string | null;
+  last_updated_timestamp: string;
+}
+
+interface Account {
+  id: number;
+  safe: string;
+  mnemonic: string;
+  env: {
+    id: number;
+    default_source: string;
+    default_platform: {
+      id: number;
+      tech: string;
+      name: string;
+    };
+  };
+  url: string;
+  push_url: string | null;
+  name: string;
+  aim_app_id: string;
+  aim_cred_app_id: string;
+  description: string;
+  safe_apps: string;
+  ad_tech: string | null;
+  ad_platform: string | null;
+  ad_cpm: string | null;
+  ad_device: string | null;
+  ad_label: string | null;
+  cyberark_username: string;
+  conf_credential_key: string;
+  cyberark_user_safe: string;
+}
+
+interface Group {
+  id: number;
+  name: string;
+  ad?: boolean;
+  oud?: boolean;
+  mainframe?: boolean;
+  credential?: boolean;
+  cyberark_platform?: boolean;
+  tech?: string;
+}
 
 interface Props {
   closeErrorModal: (...args: any[]) => any;
   routerProps: RouterProps;
   accountHasUnlinked: boolean;
   accountWasUnlinked: boolean;
-  fetchSVCs: (...args: any[]) => any;
-  fetchAllSVCs: (...args: any[]) => any;
+  fetchSvcs: (...args: any[]) => any;
+  fetchAllSvcs: (...args: any[]) => any;
   fetchServiceToken: (...args: any[]) => any;
   fetchAccounts: (...args: any[]) => any;
   fetchGroups: (...args: any[]) => any;
@@ -168,7 +395,7 @@ interface Props {
   classes?: any;
 }
 
-describe('ServicesView Component', () => {
+describe('ServicesPage Component', () => {
   let mockNavigate: NavigateFunction;
   let mockLocation: Location;
   let mockParams: Readonly<Params<string>>;
@@ -194,8 +421,8 @@ describe('ServicesView Component', () => {
       },
       accountHasUnlinked: mockInitialProps.accountHasUnlinked,
       accountWasUnlinked: mockInitialProps.accountWasUnlinked,
-      fetchSVCs: jest.fn(),
-      fetchAllSVCs: jest.fn(),
+      fetchSvcs: jest.fn(),
+      fetchAllSvcs: jest.fn(),
       fetchServiceToken: jest.fn(),
       fetchAccounts: jest.fn(),
       fetchGroups: jest.fn(),
@@ -224,13 +451,33 @@ describe('ServicesView Component', () => {
     store.clearActions();
   });
 
-  it('renders the component and displays services', () => {
-    render(
+  test('renders ServicesPage with the "Services" text', () => {
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
       <Provider store={store}>
-        <MemoryRouter>
-          <ServicesView {...mockProps} />
-        </MemoryRouter>
+        <ServicesView {...mockProps} />
       </Provider>
+    )));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText(/Services/)).toBeInTheDocument();
+  });
+
+  test('renders the component and displays services', () => {
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
+      <Provider store={store}>
+        <ServicesView {...mockProps} />
+      </Provider>
+    )));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
     );
 
     expect(screen.getByTestId('search-box')).toBeInTheDocument();
@@ -242,13 +489,17 @@ describe('ServicesView Component', () => {
     expect(screen.getByText('254_44')).toBeInTheDocument();
   });
 
-  it('fetches services and accounts on mount', async () => {
-    render(
+  test('fetches services and accounts on mount', async () => {
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
       <Provider store={store}>
-        <MemoryRouter>
-          <ServicesView {...mockProps} />
-        </MemoryRouter>
+        <ServicesView {...mockProps} />
       </Provider>
+    )));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
     );
 
     await waitFor(() => {
@@ -262,7 +513,7 @@ describe('ServicesView Component', () => {
     });
   });
 
-  it('filters services based on input', async () => {
+  test('filters services based on input', async () => {
     mockProps.services.items = [
       ...mockProps.services.items,
       {
@@ -286,12 +537,16 @@ describe('ServicesView Component', () => {
     ];
     mockProps.allservices.items = mockProps.services.items;
 
-    render(
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
       <Provider store={store}>
-        <MemoryRouter>
-          <ServicesView {...mockProps} />
-        </MemoryRouter>
+        <ServicesView {...mockProps} />
       </Provider>
+    )));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
     );
 
     const filterInput = screen.getByTestId('search-box');
@@ -304,13 +559,17 @@ describe('ServicesView Component', () => {
     expect(screen.queryByText('255_45')).not.toBeInTheDocument();
   });
 
-  it('selects a service on click', async () => {
-    render(
+  test('selects a service on click and navigates', async () => {
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
       <Provider store={store}>
-        <MemoryRouter>
-          <ServicesView {...mockProps} />
-        </MemoryRouter>
+        <ServicesView {...mockProps} />
       </Provider>
+    )));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
     );
 
     expect(screen.getByText('No Service Selected')).toBeInTheDocument();
@@ -321,41 +580,95 @@ describe('ServicesView Component', () => {
     });
 
     expect(screen.getByText('Selected: 254_44')).toBeInTheDocument();
+    expect(mockNavigate).toHaveBeenCalledWith('/services/254');
   });
 
-  it('navigates to service details on mount with svcId', () => {
+  test('navigates to service details on mount with svcId', () => {
     (router.useParams as jest.Mock).mockReturnValue({ svcId: '254' });
 
-    render(
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
       <Provider store={store}>
-        <MemoryRouter initialEntries={['/services/254']}>
-          <ServicesView
-            {...mockProps}
-            routerProps={{
-              navigate: mockNavigate,
-              location: mockLocation,
-              params: { svcId: '254' },
-            }}
-          />
-        </MemoryRouter>
+        <ServicesView
+          {...mockProps}
+          routerProps={{
+            navigate: mockNavigate,
+            location: mockLocation,
+            params: { svcId: '254' },
+          }}
+        />
       </Provider>
+    )));
+
+    render(
+      <MemoryRouter initialEntries={['/services/254']}>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
     );
 
     expect(mockNavigate).toHaveBeenCalledWith('/services/254');
   });
 
-  it('handles pagination correctly', async () => {
+  test('handles pagination correctly', async () => {
+    const paginatedStore = mockStore({
+      ...store.getState(),
+      services: {
+        items: Array.from({ length: 30 }, (_, i) => ({
+          id: 254 + i,
+          name: `Service_${254 + i}`,
+          account_use: "APP",
+          cyberark_id: `653_${i}`,
+          last_password_reset: "2024-04-17 15:46:35+08:00",
+          last_password_fetch: "2024-04-24 19:26:36+08:00",
+          record_creation_date: null,
+          user_defined_name: `SB_DB_RND_${i}`,
+          address: `SB_DB_RND_${i}`,
+          description: "This is a RND Credential Database",
+          active: true,
+          created_by: "PK26956",
+          cyberark_managed: false,
+          prod_domain: "",
+          rtm_number: null,
+          last_updated_timestamp: "2024-04-26T08:05:11.679246Z",
+        })),
+        isFetching: false,
+      },
+      allservices: {
+        items: Array.from({ length: 30 }, (_, i) => ({
+          id: 254 + i,
+          name: `Service_${254 + i}`,
+          account_use: "APP",
+          cyberark_id: `653_${i}`,
+          last_password_reset: "2024-04-17 15:46:35+08:00",
+          last_password_fetch: "2024-04-24 19:26:36+08:00",
+          record_creation_date: null,
+          user_defined_name: `SB_DB_RND_${i}`,
+          address: `SB_DB_RND_${i}`,
+          description: "This is a RND Credential Database",
+          active: true,
+          created_by: "PK26956",
+          cyberark_managed: false,
+          prod_domain: "",
+          rtm_number: null,
+          last_updated_timestamp: "2024-04-26T08:05:11.679246Z",
+        })),
+        isFetching: false,
+      },
+    });
+
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
+      <Provider store={paginatedStore}>
+        <ServicesView
+          {...mockProps}
+          services={paginatedStore.getState().services}
+          allservices={paginatedStore.getState().allservices}
+        />
+      </Provider>
+    )));
 
     render(
-      <Provider store={paginatedStore}>
-        <MemoryRouter>
-          <ServicesView
-            {...mockProps}
-            services={paginatedStore.getState().services}
-            allservices={paginatedStore.getState().allservices}
-          />
-        </MemoryRouter>
-      </Provider>
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
     );
 
     expect(screen.getByText('Service_254')).toBeInTheDocument();
@@ -370,13 +683,17 @@ describe('ServicesView Component', () => {
     expect(screen.getByText('Service_284')).toBeInTheDocument();
   });
 
-  it('updates limit correctly', async () => {
-    render(
+  test('updates limit correctly', async () => {
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
       <Provider store={store}>
-        <MemoryRouter>
-          <ServicesView {...mockProps} />
-        </MemoryRouter>
+        <ServicesView {...mockProps} />
       </Provider>
+    )));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
     );
 
     const setLimitButton = screen.getByText('Set Limit 10');
@@ -387,13 +704,17 @@ describe('ServicesView Component', () => {
     expect(setLimitButton).toBeInTheDocument();
   });
 
-  it('toggles account conformity', async () => {
-    render(
+  test('toggles account conformity', async () => {
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
       <Provider store={store}>
-        <MemoryRouter>
-          <ServicesView {...mockProps} />
-        </MemoryRouter>
+        <ServicesView {...mockProps} />
       </Provider>
+    )));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
     );
 
     const toggleButton = screen.getByText('Toggle Conformity');
@@ -404,13 +725,17 @@ describe('ServicesView Component', () => {
     expect(toggleButton).toBeInTheDocument();
   });
 
-  it('creates a new service', async () => {
-    render(
+  test('creates a new service', async () => {
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
       <Provider store={store}>
-        <MemoryRouter>
-          <ServicesView {...mockProps} />
-        </MemoryRouter>
+        <ServicesView {...mockProps} />
       </Provider>
+    )));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
     );
 
     const addButton = screen.getByText('Add Service');
@@ -429,13 +754,17 @@ describe('ServicesView Component', () => {
     );
   });
 
-  it('edits an existing service', async () => {
-    render(
+  test('edits an existing service', async () => {
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
       <Provider store={store}>
-        <MemoryRouter>
-          <ServicesView {...mockProps} />
-        </MemoryRouter>
+        <ServicesView {...mockProps} />
       </Provider>
+    )));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
     );
 
     const service = screen.getByTestId('service-254');
@@ -454,13 +783,17 @@ describe('ServicesView Component', () => {
     );
   });
 
-  it('deletes a service', async () => {
-    render(
+  test('deletes a service', async () => {
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
       <Provider store={store}>
-        <MemoryRouter>
-          <ServicesView {...mockProps} />
-        </MemoryRouter>
+        <ServicesView {...mockProps} />
       </Provider>
+    )));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
     );
 
     const service = screen.getByTestId('service-254');
@@ -484,5 +817,28 @@ describe('ServicesView Component', () => {
     );
 
     expect(screen.queryByTestId('alert-dialog')).not.toBeInTheDocument();
+  });
+
+  test('renders with empty services list', () => {
+    const emptyProps = {
+      ...mockProps,
+      services: { items: [], isFetching: false },
+      allservices: { items: [], isFetching: false },
+    };
+
+    const ServicesViewWithRouter = withRouter(withStyles(() => (
+      <Provider store={store}>
+        <ServicesView {...emptyProps} />
+      </Provider>
+    )));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId('scroll-list')).toBeInTheDocument();
+    expect(screen.queryByText('254_44')).not.toBeInTheDocument();
   });
 });
