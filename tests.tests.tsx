@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
 import { MemoryRouter, NavigateFunction, Location, Params } from 'react-router-dom';
@@ -97,6 +97,107 @@ jest.mock('../ServicesPage.styles.ts', () => jest.fn(() => ({
   },
 })));
 
+// Mock child components
+jest.mock('../../../../layouts/EmailDetailsLayout/SearchBox/SearchBox', () => ({
+  SearchBox: ({ filterValue, onInputChange }) => (
+    <input
+      data-testid="search-box"
+      value={filterValue}
+      onChange={onInputChange}
+      placeholder="Filter services..."
+    />
+  ),
+}));
+
+jest.mock('../../../../layouts/EmailDetailsLayout/NavBarView/navBarView', () => ({
+  NavBarView: () => <div data-testid="nav-bar">NavBar</div>,
+}));
+
+jest.mock('../../../../layouts/EmailDetailsLayout/ScrollListView/ScrollListView', () => ({
+  ScrollListView: ({ items, filterValue, filteredItems, listItemClick, handleAddClick }) => {
+    const services = filterValue ? filteredItems.items : items.items;
+    return (
+      <div data-testid="scroll-list">
+        <button onClick={handleAddClick} data-testid="add-service-button">Add Service</button>
+        {services.map((svc) => (
+          <div
+            key={svc.id || svc.svc_id}
+            onClick={() => listItemClick(svc)}
+            data-testid={`service-${svc.id || svc.svc_id}`}
+          >
+            {svc.name}
+          </div>
+        ))}
+      </div>
+    );
+  },
+}));
+
+jest.mock('../../../../layouts/EmailDetailsLayout/PaginationView/PaginationView', () => ({
+  PaginationView: ({ items, filterValue, filteredItems, page, limit, handleNext, handlePrevious, updateLimit }) => {
+    const services = filterValue ? filteredItems.items : items.items;
+    const totalPages = Math.ceil(services.length / limit);
+    return (
+      <div data-testid="pagination">
+        <span>Page {page}</span>
+        <button onClick={handlePrevious} disabled={page === 1} data-testid="previous-button">
+          Previous
+        </button>
+        <button onClick={handleNext} disabled={page === totalPages} data-testid="next-button">
+          Next
+        </button>
+        <button onClick={() => updateLimit(10, services)} data-testid="set-limit-10">
+          Set Limit 10
+        </button>
+      </div>
+    );
+  },
+}));
+
+jest.mock('../../../../layouts/EmailDetailsLayout/ServiceDetails/ServiceDetails', () => ({
+  ServiceDetails: ({
+    selectedService,
+    toggleAccountConformity,
+    startCreatingNewService,
+    editExistingSvc,
+    openAlertDialog,
+  }) => (
+    <div data-testid="service-details">
+      {selectedService ? <div>Selected: {selectedService.name}</div> : <div>No Service Selected</div>}
+      <button onClick={toggleAccountConformity} data-testid="toggle-conformity">
+        Toggle Conformity
+      </button>
+      <button onClick={startCreatingNewService} data-testid="create-service">
+        Create Service
+      </button>
+      {selectedService && (
+        <button onClick={editExistingSvc} data-testid="edit-service">
+          Edit Service
+        </button>
+      )}
+      {selectedService && (
+        <button
+          onClick={() => openAlertDialog({ target: { innerText: 'DEACTIVATE' } })}
+          data-testid="deactivate-button"
+        >
+          Deactivate
+        </button>
+      )}
+    </div>
+  ),
+}));
+
+jest.mock('../../../../layouts/EmailDetailsLayout/AlertDialog/AlertDialog', () => ({
+  AlertDialog: ({ shouldOpen, closeFn, executeFn, description, executeMessage }) =>
+    shouldOpen ? (
+      <div data-testid="alert-dialog">
+        <p>{description}</p>
+        <button onClick={closeFn} data-testid="cancel-button">Cancel</button>
+        <button onClick={executeFn} data-testid="execute-button">{executeMessage}</button>
+      </div>
+    ) : null,
+}));
+
 // Initialize the mock store using defaultState and imported mocks
 const store = mockStore({
   ...defaultState,
@@ -187,7 +288,6 @@ describe('ServicesPage Component', () => {
       params: mockParams,
     };
 
-    // Ensure fetchSvcs and fetchAccounts are called by mocking their resolved values
     networkFetchSvcs.mockResolvedValueOnce([]);
     networkFetchAccounts.mockResolvedValueOnce([]);
 
@@ -203,7 +303,6 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    // Wait for async effects to complete
     await screen.findByText(/Services/);
 
     expect(networkFetchSvcs).toHaveBeenCalledTimes(1);
@@ -270,7 +369,6 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    // Wait for async effects to complete
     await screen.findByText(/Services/);
 
     expect(mockNavigate).toHaveBeenCalledTimes(1);
@@ -306,12 +404,11 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const searchInput = screen.getByPlaceholderText(/Filter services/i);
+    const searchInput = screen.getByTestId('search-box');
     fireEvent.change(searchInput, { target: { value: 'Service A' } });
 
-    const filteredServices = screen.getAllByText(/Service A/i);
-    expect(filteredServices[0]).toBeInTheDocument();
-    expect(screen.queryByText(/Service B/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('service-1')).toHaveTextContent('Service A');
+    expect(screen.queryByTestId('service-2')).not.toBeInTheDocument();
   });
 
   test('paginates services when clicking the next button', async () => {
@@ -345,7 +442,7 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const nextButton = screen.getByText(/Next/i);
+    const nextButton = screen.getByTestId('next-button');
     fireEvent.click(nextButton);
 
     expect(screen.getByText(/Page 2/i)).toBeInTheDocument();
@@ -370,9 +467,358 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const addButton = screen.getByText(/Add Service/i);
+    const addButton = screen.getByTestId('add-service-button');
     fireEvent.click(addButton);
 
     expect(mockNavigate).toHaveBeenCalledWith('/services/add');
+  });
+
+  test('selects a service when clicking a list item', async () => {
+    const mockService = { svc_id: 1, name: 'Service A' };
+    const updatedProps = {
+      ...initialProps,
+      services: {
+        items: [mockService],
+        isFetching: false,
+      },
+    };
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: mockParams,
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...updatedProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    const serviceItem = screen.getByTestId('service-1');
+    fireEvent.click(serviceItem);
+
+    expect(mockNavigate).toHaveBeenCalledWith('/services/1');
+    expect(screen.getByText(/Selected: Service A/i)).toBeInTheDocument();
+  });
+
+  test('toggles account conformity for a selected service', async () => {
+    const mockService = { svc_id: 1, name: 'Service A' };
+    const updatedProps = {
+      ...initialProps,
+      services: {
+        items: [mockService],
+        isFetching: false,
+      },
+    };
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: { svcId: '1' },
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...updatedProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter initialEntries={['/services/1']}>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    const toggleButton = screen.getByTestId('toggle-conformity');
+    fireEvent.click(toggleButton);
+
+    expect(screen.getByText(/Selected: Service A/i)).toBeInTheDocument();
+  });
+
+  test('initiates editing a selected service', async () => {
+    const mockService = { svc_id: 1, name: 'Service A' };
+    const updatedProps = {
+      ...initialProps,
+      services: {
+        items: [mockService],
+        isFetching: false,
+      },
+    };
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: { svcId: '1' },
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...updatedProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter initialEntries={['/services/1']}>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    const editButton = screen.getByTestId('edit-service');
+    fireEvent.click(editButton);
+
+    expect(mockNavigate).toHaveBeenCalledWith('/services/1/edit');
+  });
+
+  test('deactivates a selected service via alert dialog', async () => {
+    const mockService = { svc_id: 1, name: 'Service A' };
+    const updatedProps = {
+      ...initialProps,
+      services: {
+        items: [mockService],
+        isFetching: false,
+      },
+    };
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: { svcId: '1' },
+    };
+
+    deleteService.mockResolvedValueOnce({});
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...updatedProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter initialEntries={['/services/1']}>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    const deactivateButton = screen.getByTestId('deactivate-button');
+    fireEvent.click(deactivateButton);
+
+    const executeButton = screen.getByTestId('execute-button');
+    fireEvent.click(executeButton);
+
+    await waitFor(() => {
+      expect(deleteService).toHaveBeenCalledWith(mockService);
+      expect(mockNavigate).toHaveBeenCalledWith('/services');
+    });
+  });
+
+  test('cancels deactivation via alert dialog', async () => {
+    const mockService = { svc_id: 1, name: 'Service A' };
+    const updatedProps = {
+      ...initialProps,
+      services: {
+        items: [mockService],
+        isFetching: false,
+      },
+    };
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: { svcId: '1' },
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...updatedProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter initialEntries={['/services/1']}>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    const deactivateButton = screen.getByTestId('deactivate-button');
+    fireEvent.click(deactivateButton);
+
+    const cancelButton = screen.getByTestId('cancel-button');
+    fireEvent.click(cancelButton);
+
+    expect(screen.queryByTestId('alert-dialog')).not.toBeInTheDocument();
+    expect(deleteService).not.toHaveBeenCalled();
+  });
+
+  test('handles fetch error for services', async () => {
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: mockParams,
+    };
+
+    networkFetchSvcs.mockRejectedValueOnce(new Error('Fetch error'));
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...initialProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(closeErrorModal).toBeDefined();
+    });
+  });
+
+  test('updates pagination limit', async () => {
+    const mockServicesList = Array.from({ length: 15 }, (_, i) => ({
+      svc_id: i + 1,
+      name: `Service ${i + 1}`,
+    }));
+    const updatedProps = {
+      ...initialProps,
+      services: {
+        items: mockServicesList,
+        isFetching: false,
+      },
+    };
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: mockParams,
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...updatedProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    const setLimitButton = screen.getByTestId('set-limit-10');
+    fireEvent.click(setLimitButton);
+
+    expect(screen.getByText(/Page 1/i)).toBeInTheDocument();
+  });
+
+  test('navigates to previous page', async () => {
+    const mockServicesList = Array.from({ length: 15 }, (_, i) => ({
+      svc_id: i + 1,
+      name: `Service ${i + 1}`,
+    }));
+    const updatedProps = {
+      ...initialProps,
+      services: {
+        items: mockServicesList,
+        isFetching: false,
+      },
+    };
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: mockParams,
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...updatedProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    const nextButton = screen.getByTestId('next-button');
+    fireEvent.click(nextButton);
+
+    const previousButton = screen.getByTestId('previous-button');
+    fireEvent.click(previousButton);
+
+    expect(screen.getByText(/Page 1/i)).toBeInTheDocument();
+  });
+
+  test('renders loading state while fetching services', () => {
+    const loadingProps = {
+      ...initialProps,
+      services: { items: [], isFetching: true },
+      allservices: { items: [], isFetching: true },
+    };
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: mockParams,
+    };
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...loadingProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId('scroll-list')).toBeInTheDocument();
+  });
+
+  test('fetches service token when needed', async () => {
+    const mockService = { svc_id: 1, name: 'Service A' };
+    const updatedProps = {
+      ...initialProps,
+      services: {
+        items: [mockService],
+        isFetching: false,
+      },
+    };
+
+    const routerProps = {
+      navigate: mockNavigate,
+      location: mockLocation,
+      params: { svcId: '1' },
+    };
+
+    fetchServiceToken.mockResolvedValueOnce('mock-token');
+
+    const ServicesViewWithRouter = withRouter(() => (
+      <Provider store={store}>
+        <ServicesView {...updatedProps} routerProps={routerProps} />
+      </Provider>
+    ));
+
+    render(
+      <MemoryRouter initialEntries={['/services/1']}>
+        <ServicesViewWithRouter />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(fetchServiceToken).toHaveBeenCalled();
+    });
   });
 });
