@@ -59,15 +59,15 @@ jest.mock('react-router-dom', () => {
   };
 });
 
-// Mock network utils using jest.fn()
+// Mock network utils using jest.fn() with proper typing
 jest.mock('../../../../utils/network', () => ({
-  networkFetchPayloads: jest.fn(),
-  networkFetchAccounts: jest.fn(),
-  networkFetchSvcGroups: jest.fn(),
-  networkFetchSvcs: jest.fn(),
+  networkFetchPayloads: jest.fn() as jest.Mock<Promise<any>>,
+  networkFetchAccounts: jest.fn() as jest.Mock<Promise<any>>,
+  networkFetchSvcGroups: jest.fn() as jest.Mock<Promise<any>>,
+  networkFetchSvcs: jest.fn() as jest.Mock<Promise<any>>,
 }));
 
-// Mock Redux actions
+// Mock Redux actions with proper typing
 jest.mock('../../../../Redux/actions/network', () => ({
   createFetchActionCreator: jest.fn().mockImplementation((typeArg) => {
     const types = {
@@ -79,11 +79,11 @@ jest.mock('../../../../Redux/actions/network', () => ({
     };
     return () => ({ type: types[typeArg] });
   }),
-  addService: jest.fn(),
-  updateService: jest.fn(),
-  deleteService: jest.fn(),
-  removeGroupAccount: jest.fn(),
-  fetchServiceToken: jest.fn(),
+  addService: jest.fn() as jest.Mock<Promise<any>>,
+  updateService: jest.fn() as jest.Mock<Promise<any>>,
+  deleteService: jest.fn() as jest.Mock<Promise<any>>,
+  removeGroupAccount: jest.fn() as jest.Mock<Promise<any>>,
+  fetchServiceToken: jest.fn() as jest.Mock<Promise<any>>,
 }));
 
 // Mock the styles module
@@ -288,8 +288,8 @@ describe('ServicesPage Component', () => {
       params: mockParams,
     };
 
-    networkFetchSvcs.mockResolvedValueOnce([]);
-    networkFetchAccounts.mockResolvedValueOnce([]);
+    (networkFetchSvcs as jest.Mock).mockReturnValue(Promise.resolve([]));
+    (networkFetchAccounts as jest.Mock).mockReturnValue(Promise.resolve([]));
 
     const ServicesViewWithRouter = withRouter(() => (
       <Provider store={store}>
@@ -592,7 +592,7 @@ describe('ServicesPage Component', () => {
       params: { svcId: '1' },
     };
 
-    deleteService.mockResolvedValueOnce({});
+    (deleteService as jest.Mock).mockReturnValue(Promise.resolve({}));
 
     const ServicesViewWithRouter = withRouter(() => (
       <Provider store={store}>
@@ -663,7 +663,7 @@ describe('ServicesPage Component', () => {
       params: mockParams,
     };
 
-    networkFetchSvcs.mockRejectedValueOnce(new Error('Fetch error'));
+    (networkFetchSvcs as jest.Mock).mockReturnValue(Promise.reject(new Error('Fetch error')));
 
     const ServicesViewWithRouter = withRouter(() => (
       <Provider store={store}>
@@ -803,7 +803,7 @@ describe('ServicesPage Component', () => {
       params: { svcId: '1' },
     };
 
-    fetchServiceToken.mockResolvedValueOnce('mock-token');
+    (fetchServiceToken as jest.Mock).mockReturnValue(Promise.resolve('mock-token'));
 
     const ServicesViewWithRouter = withRouter(() => (
       <Provider store={store}>
@@ -833,8 +833,8 @@ describe('ServicesPage Component', () => {
       },
     };
 
-    networkFetchSvcs.mockResolvedValue([]);
-    networkFetchAccounts.mockResolvedValue([]);
+    (networkFetchSvcs as jest.Mock).mockReturnValue(Promise.resolve([]));
+    (networkFetchAccounts as jest.Mock).mockReturnValue(Promise.resolve([]));
 
     const routerProps = {
       navigate: mockNavigate,
@@ -927,8 +927,8 @@ describe('ServicesPage Component', () => {
       params: { svcId: '1' },
     };
 
-    deleteService.mockResolvedValue({});
-    fetchServiceToken.mockResolvedValue('mock-token');
+    (deleteService as jest.Mock).mockReturnValue(Promise.resolve({}));
+    (fetchServiceToken as jest.Mock).mockReturnValue(Promise.resolve('mock-token'));
 
     const ServicesViewWithRouter = withRouter(() => (
       <Provider store={store}>
