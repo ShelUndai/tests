@@ -97,107 +97,6 @@ jest.mock('../ServicesPage.styles.ts', () => jest.fn(() => ({
   },
 })));
 
-// Mock child components
-jest.mock('../../../../layouts/EmailDetailsLayout/SearchBox/SearchBox', () => ({
-  SearchBox: ({ filterValue, onInputChange }) => (
-    <input
-      data-testid="search-box"
-      value={filterValue}
-      onChange={onInputChange}
-      placeholder="Filter services..."
-    />
-  ),
-}));
-
-jest.mock('../../../../layouts/EmailDetailsLayout/NavBarView/navBarView', () => ({
-  NavBarView: () => <div data-testid="nav-bar">NavBar</div>,
-}));
-
-jest.mock('../../../../layouts/EmailDetailsLayout/ScrollListView/ScrollListView', () => ({
-  ScrollListView: ({ items, filterValue, filteredItems, listItemClick, handleAddClick }) => {
-    const services = filterValue ? filteredItems.items : items.items;
-    return (
-      <div data-testid="scroll-list">
-        <button onClick={handleAddClick} data-testid="add-service-button">Add Service</button>
-        {services.map((svc) => (
-          <div
-            key={svc.id || svc.svc_id}
-            onClick={() => listItemClick(svc)}
-            data-testid={`service-${svc.id || svc.svc_id}`}
-          >
-            {svc.name}
-          </div>
-        ))}
-      </div>
-    );
-  },
-}));
-
-jest.mock('../../../../layouts/EmailDetailsLayout/PaginationView/PaginationView', () => ({
-  PaginationView: ({ items, filterValue, filteredItems, page, limit, handleNext, handlePrevious, updateLimit }) => {
-    const services = filterValue ? filteredItems.items : items.items;
-    const totalPages = Math.ceil(services.length / limit);
-    return (
-      <div data-testid="pagination">
-        <span>Page {page}</span>
-        <button onClick={handlePrevious} disabled={page === 1} data-testid="previous-button">
-          Previous
-        </button>
-        <button onClick={handleNext} disabled={page === totalPages} data-testid="next-button">
-          Next
-        </button>
-        <button onClick={() => updateLimit(10, services)} data-testid="set-limit-10">
-          Set Limit 10
-        </button>
-      </div>
-    );
-  },
-}));
-
-jest.mock('../../../../layouts/EmailDetailsLayout/ServiceDetails/ServiceDetails', () => ({
-  ServiceDetails: ({
-    selectedService,
-    toggleAccountConformity,
-    startCreatingNewService,
-    editExistingSvc,
-    openAlertDialog,
-  }) => (
-    <div data-testid="service-details">
-      {selectedService ? <div>Selected: {selectedService.name}</div> : <div>No Service Selected</div>}
-      <button onClick={toggleAccountConformity} data-testid="toggle-conformity">
-        Toggle Conformity
-      </button>
-      <button onClick={startCreatingNewService} data-testid="create-service">
-        Create Service
-      </button>
-      {selectedService && (
-        <button onClick={editExistingSvc} data-testid="edit-service">
-          Edit Service
-        </button>
-      )}
-      {selectedService && (
-        <button
-          onClick={() => openAlertDialog({ target: { innerText: 'DEACTIVATE' } })}
-          data-testid="deactivate-button"
-        >
-          Deactivate
-        </button>
-      )}
-    </div>
-  ),
-}));
-
-jest.mock('../../../../layouts/EmailDetailsLayout/AlertDialog/AlertDialog', () => ({
-  AlertDialog: ({ shouldOpen, closeFn, executeFn, description, executeMessage }) =>
-    shouldOpen ? (
-      <div data-testid="alert-dialog">
-        <p>{description}</p>
-        <button onClick={closeFn} data-testid="cancel-button">Cancel</button>
-        <button onClick={executeFn} data-testid="execute-button">{executeMessage}</button>
-      </div>
-    ) : null,
-}));
-
 // Initialize the mock store using defaultState and imported mocks
 const store = mockStore({
   ...defaultState,
@@ -404,11 +303,11 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const searchInput = screen.getByTestId('search-box');
+    const searchInput = screen.getByPlaceholderText(/Filter services/i);
     fireEvent.change(searchInput, { target: { value: 'Service A' } });
 
-    expect(screen.getByTestId('service-1')).toHaveTextContent('Service A');
-    expect(screen.queryByTestId('service-2')).not.toBeInTheDocument();
+    expect(screen.getByText(/Service A/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Service B/i)).not.toBeInTheDocument();
   });
 
   test('paginates services when clicking the next button', async () => {
@@ -442,7 +341,7 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const nextButton = screen.getByTestId('next-button');
+    const nextButton = screen.getByRole('button', { name: /Next/i });
     fireEvent.click(nextButton);
 
     expect(screen.getByText(/Page 2/i)).toBeInTheDocument();
@@ -467,7 +366,7 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const addButton = screen.getByTestId('add-service-button');
+    const addButton = screen.getByRole('button', { name: /Add Service/i });
     fireEvent.click(addButton);
 
     expect(mockNavigate).toHaveBeenCalledWith('/services/add');
@@ -501,7 +400,7 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const serviceItem = screen.getByTestId('service-1');
+    const serviceItem = screen.getByText(/Service A/i);
     fireEvent.click(serviceItem);
 
     expect(mockNavigate).toHaveBeenCalledWith('/services/1');
@@ -536,7 +435,7 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const toggleButton = screen.getByTestId('toggle-conformity');
+    const toggleButton = screen.getByRole('button', { name: /Toggle Conformity/i });
     fireEvent.click(toggleButton);
 
     expect(screen.getByText(/Selected: Service A/i)).toBeInTheDocument();
@@ -570,7 +469,7 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const editButton = screen.getByTestId('edit-service');
+    const editButton = screen.getByRole('button', { name: /Edit Service/i });
     fireEvent.click(editButton);
 
     expect(mockNavigate).toHaveBeenCalledWith('/services/1/edit');
@@ -606,10 +505,10 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const deactivateButton = screen.getByTestId('deactivate-button');
+    const deactivateButton = screen.getByRole('button', { name: /Deactivate/i });
     fireEvent.click(deactivateButton);
 
-    const executeButton = screen.getByTestId('execute-button');
+    const executeButton = screen.getByRole('button', { name: /Confirm/i });
     fireEvent.click(executeButton);
 
     await waitFor(() => {
@@ -646,13 +545,13 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const deactivateButton = screen.getByTestId('deactivate-button');
+    const deactivateButton = screen.getByRole('button', { name: /Deactivate/i });
     fireEvent.click(deactivateButton);
 
-    const cancelButton = screen.getByTestId('cancel-button');
+    const cancelButton = screen.getByRole('button', { name: /Cancel/i });
     fireEvent.click(cancelButton);
 
-    expect(screen.queryByTestId('alert-dialog')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Are you sure/i)).not.toBeInTheDocument();
     expect(deleteService).not.toHaveBeenCalled();
   });
 
@@ -713,7 +612,7 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const setLimitButton = screen.getByTestId('set-limit-10');
+    const setLimitButton = screen.getByRole('button', { name: /Set Limit 10/i });
     fireEvent.click(setLimitButton);
 
     expect(screen.getByText(/Page 1/i)).toBeInTheDocument();
@@ -750,10 +649,10 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const nextButton = screen.getByTestId('next-button');
+    const nextButton = screen.getByRole('button', { name: /Next/i });
     fireEvent.click(nextButton);
 
-    const previousButton = screen.getByTestId('previous-button');
+    const previousButton = screen.getByRole('button', { name: /Previous/i });
     fireEvent.click(previousButton);
 
     expect(screen.getByText(/Page 1/i)).toBeInTheDocument();
@@ -784,7 +683,7 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByTestId('scroll-list')).toBeInTheDocument();
+    expect(screen.getByText(/Services/i)).toBeInTheDocument();
   });
 
   test('fetches service token when needed', async () => {
@@ -856,7 +755,7 @@ describe('ServicesPage Component', () => {
 
     await screen.findByText(/Services/);
 
-    const searchInput = screen.getByTestId('search-box');
+    const searchInput = screen.getByPlaceholderText(/Filter services/i);
     fireEvent.change(searchInput, { target: { value: 'Service A' } });
 
     expect(0).toEqual(0);
@@ -893,19 +792,19 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const nextButton = screen.getByTestId('next-button');
+    const nextButton = screen.getByRole('button', { name: /Next/i });
     fireEvent.click(nextButton);
 
-    const previousButton = screen.getByTestId('previous-button');
+    const previousButton = screen.getByRole('button', { name: /Previous/i });
     fireEvent.click(previousButton);
 
-    const setLimitButton = screen.getByTestId('set-limit-10');
+    const setLimitButton = screen.getByRole('button', { name: /Set Limit 10/i });
     fireEvent.click(setLimitButton);
 
-    const addButton = screen.getByTestId('add-service-button');
+    const addButton = screen.getByRole('button', { name: /Add Service/i });
     fireEvent.click(addButton);
 
-    const serviceItem = screen.getByTestId('service-1');
+    const serviceItem = screen.getByText(/Service 1/i);
     fireEvent.click(serviceItem);
 
     expect(0).toEqual(0);
@@ -942,23 +841,23 @@ describe('ServicesPage Component', () => {
       </MemoryRouter>
     );
 
-    const toggleButton = screen.getByTestId('toggle-conformity');
+    const toggleButton = screen.getByRole('button', { name: /Toggle Conformity/i });
     fireEvent.click(toggleButton);
 
-    const createButton = screen.getByTestId('create-service');
+    const createButton = screen.getByRole('button', { name: /Create Service/i });
     fireEvent.click(createButton);
 
-    const editButton = screen.getByTestId('edit-service');
+    const editButton = screen.getByRole('button', { name: /Edit Service/i });
     fireEvent.click(editButton);
 
-    const deactivateButton = screen.getByTestId('deactivate-button');
+    const deactivateButton = screen.getByRole('button', { name: /Deactivate/i });
     fireEvent.click(deactivateButton);
 
-    const cancelButton = screen.getByTestId('cancel-button');
+    const cancelButton = screen.getByRole('button', { name: /Cancel/i });
     fireEvent.click(cancelButton);
 
     fireEvent.click(deactivateButton);
-    const executeButton = screen.getByTestId('execute-button');
+    const executeButton = screen.getByRole('button', { name: /Confirm/i });
     fireEvent.click(executeButton);
 
     await waitFor(() => {
